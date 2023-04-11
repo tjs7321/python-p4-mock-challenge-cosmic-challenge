@@ -19,6 +19,8 @@ db = SQLAlchemy(metadata=metadata)
 class Planet(db.Model, SerializerMixin):
     __tablename__ = 'planets'
 
+    serialize_rules = ('-missions.planet', '-scientists.planets')
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
     distance_from_earth = db.Column(db.String)
@@ -31,6 +33,8 @@ class Planet(db.Model, SerializerMixin):
 
 class Scientist(db.Model, SerializerMixin):
     __tablename__ = 'scientists'
+
+    serialize_rules = ('-missions.scientist', '-planets.scientists')
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, unique=True)
@@ -55,6 +59,8 @@ class Scientist(db.Model, SerializerMixin):
 
 class Mission(db.Model, SerializerMixin):
     __tablename__ = 'missions'
+
+    serialize_rules = ('-scientist.missions', '-planet.missions')
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
