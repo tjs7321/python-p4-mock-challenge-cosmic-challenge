@@ -88,8 +88,7 @@ Add validations to the `Scientist` model:
 
 Add validations to the `Mission` model:
 
-- must have a `name`, a `scientist` and a `planet`
-- a `scientist` cannot join the same `mission` twice
+- must have a `name`, a `scientist_id` and a `planet_id`
 
 ## Routes
 
