@@ -1,4 +1,4 @@
-# Flask Mock Challenge - Cosmic Travel (No Tests!)
+# Flask Mock Challenge - Cosmic Travel
 
 It is the year 2100 and you run an interplanetary space travel agency. You are
 building a website to book scientists on missions to other planets.
