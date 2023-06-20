@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 
-from flask import Flask, request
+from models import db, Scientist, Mission, Planet
+from flask_restful import Api, Resource
 from flask_migrate import Migrate
+from flask import Flask, make_response, jsonify, request
+import os
 
-from models import db, Scientist, Planet, Mission
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DATABASE = os.environ.get(
+    "DB_URI", f"sqlite:///{os.path.join(BASE_DIR, 'app.db')}")
+
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.json.compact = False
 
@@ -14,71 +20,112 @@ migrate = Migrate(app, db)
 
 db.init_app(app)
 
+api = Api(app)
+
+
 @app.route('/')
 def home():
     return ''
 
-@app.route('/scientists', methods=['GET', 'POST'])
-def scientists():
-    if request.method == 'GET':
-        return [scientist.to_dict(rules=('-missions', '-planets')) for scientist in Scientist.query.all()]
-    elif request.method == 'POST':
+
+class Scientists(Resource):
+
+    def get(self):
+        scientists = [scientist.to_dict(rules=('-missions', '-planets',))
+                      for scientist in Scientist.query.all()]
+
+        return make_response(scientists, 200)
+
+    def post(self):
+
         fields = request.get_json()
         try:
             scientist = Scientist(
                 name=fields['name'],
-                field_of_study=fields['field_of_study'],
-                avatar=fields['avatar']
+                field_of_study=fields['field_of_study']
             )
             db.session.add(scientist)
             db.session.commit()
-            return scientist.to_dict()
+            return make_response(scientist.to_dict(rules=('-missions',)), 201)
         except ValueError:
-            return {'error': '400: Validation error'}, 400
+            return make_response({"errors": ["validation errors"]}, 400)
 
-@app.route('/scientists/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
-def scientist_by_id(id):
-    scientist = Scientist.query.filter(Scientist.id == id).one_or_none()
-    if scientist:
-        if request.method == 'GET':
-            return scientist.to_dict()
-        elif request.method == 'PATCH':
-            fields = request.get_json()
-            try:
-                for field in fields:
-                    setattr(scientist, field, fields[field])
-                db.session.add(scientist)
-                db.session.commit()
-                return scientist.to_dict(rules=('-planets', '-missions')), 202
-            except:
-                return {'error': '400: Validation error'}
-        elif request.method == 'DELETE':
-            db.session.delete(scientist)
+
+api.add_resource(Scientists, "/scientists")
+
+
+class ScientistById(Resource):
+
+    def get(self, id):
+        scientist = Scientist.query.filter(Scientist.id == id).one_or_none()
+
+        if scientist is None:
+            return make_response({'error': 'Scientist not found'}, 404)
+
+        return make_response(scientist.to_dict(), 200)
+
+    def patch(self, id):
+        scientist = Scientist.query.filter(Scientist.id == id).one_or_none()
+
+        if scientist is None:
+            return make_response({'error': 'Scientist not found'}, 404)
+
+        fields = request.get_json()
+
+        try:
+            for field in fields:
+                setattr(scientist, field, fields[field])
+            db.session.add(scientist)
             db.session.commit()
-            return {}, 204
-    return {'error': '404: Scientist not found'}
 
-@app.route('/planets', methods=['GET'])
-def planets():
-    if request.method == 'GET':
-        return [planet.to_dict(rules=('-missions', '-scientists')) for planet in Planet.query.all()]
+            return make_response(scientist.to_dict(rules=('-planets', '-missions')), 202)
 
-@app.route('/missions', methods=['POST'])
-def create_mission():
-    if request.method == 'POST':
+        except ValueError:
+            return make_response({"errors": ["validation errors"]}, 400)
+
+    def delete(self, id):
+        scientist = Scientist.query.filter(Scientist.id == id).one_or_none()
+
+        if scientist is None:
+            return make_response({'error': 'Scientist not found'}, 404)
+
+        db.session.delete(scientist)
+        db.session.commit()
+        return make_response({}, 204)
+
+
+api.add_resource(ScientistById, "/scientists/<int:id>")
+
+
+class Planets(Resource):
+
+    def get(self):
+        planets = [planet.to_dict(rules=('-missions', '-scientists',))
+                   for planet in Planet.query.all()]
+
+        return make_response(planets, 200)
+
+
+api.add_resource(Planets, "/planets")
+
+
+class Missions(Resource):
+    def post(self):
+
         fields = request.get_json()
         try:
             mission = Mission(
                 name=fields['name'],
                 scientist_id=fields['scientist_id'],
-                planet_id=fields['planet_id']
-            )
+                planet_id=fields['planet_id'])
             db.session.add(mission)
             db.session.commit()
-            return mission.to_dict()
+            return make_response(mission.to_dict(), 201)
         except ValueError:
-            return {'error': '400: Validation error'}, 400
+            return make_response({"errors": ["validation errors"]}, 400)
 
+
+api.add_resource(Missions, "/missions")
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
